@@ -25,7 +25,9 @@ Types are either one of these built-in types:
 null  int  integer  real  text  blob  date
 ~~~
 
-or the name of a table declared in the source file.
+or the name of a table declared in the source file. By default
+all values are given the `NOT NULL` qualifier, but this can be
+avoided by ending a type name with a `?` operator.
 
 All tables get an implicit `id` column of the form
 
@@ -47,7 +49,7 @@ books
 
 authors
   name:   text
-  gender: blob
+  gender: blob?
 ~~~
 
 Produces the following SQLite table declarations:
@@ -55,14 +57,14 @@ Produces the following SQLite table declarations:
 ~~~.sql
 CREATE TABLE books
   ( id INTEGER PRIMARY KEY ASC
-  , title TEXT
-  , author_name INTEGER
-  , published DATE
+  , title TEXT NOT NULL
+  , author_name INTEGER NOT NULL
+  , published DATE NOT NULL
   , FOREIGN KEY(author_name) REFERENCES authors(id)
   );
 CREATE TABLE authors
   ( id INTEGER PRIMARY KEY ASC
-  , name TEXT
+  , name TEXT NOT NULL
   , gender BLOB
   );
 ~~~

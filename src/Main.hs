@@ -13,6 +13,7 @@ data Decl = Decl
 data Field = Field
   { fName :: Text
   , fType :: Text
+  , fNull :: Bool
   } deriving (Eq, Show)
 
 uncomment :: Text -> Text
@@ -28,7 +29,8 @@ parse = go [] . map uncomment . T.lines
           | T.length (T.takeWhile isSpace l) > 0 =
             let (n, t) = T.break (== ':') (T.strip l)
                 f = Field { fName = T.strip n
-                          , fType = T.strip (T.drop 1 t)
+                          , fType = T.strip (T.drop 1 (T.filter (/= '?') t))
+                          , fNull = T.any (== '?') t
                           }
             in case ds of
                  (d:ds') -> go (d { dFields = f : dFields d } : ds') ls
@@ -75,11 +77,17 @@ pprint Decl { dName = n, dFields = fs } = do
   mapM_ printField fs
   mapM_ printForeign fs
   T.putStrLn "  );"
-  where printField Field { fName = f, fType = t } = do
+  where printField Field { fName = f
+                         , fType = t
+                         , fNull = l
+                         } = do
               T.putStr "  , "
               T.putStr f
               T.putStr " "
-              T.putStrLn (typeName t)
+              T.putStr (typeName t)
+              if not l
+                then T.putStrLn " NOT NULL"
+                else T.putStrLn ""
         printForeign Field { fName = f, fType = t }
           | t `elem` builtins = return ()
           | otherwise = do
