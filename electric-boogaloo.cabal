@@ -1,7 +1,9 @@
 name:             electric-boogaloo
-version:          0.1.0.0
--- synopsis:
--- description
+version:          0.1.1
+synopsis:         Simple opinionated sugar for SQLite
+description:      A basic translator for a straightforward, terse sugar
+                  designed for making certain SQLite table definitions
+                  easier to read and write.
 license:          BSD3
 license-file:     LICENSE
 author:           Getty Ritter <gettyritter@gmail.com>
