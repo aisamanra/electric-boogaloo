@@ -19,5 +19,6 @@ executable electric-boogaloo
   default-extensions:  OverloadedStrings,
                        ScopedTypeVariables
   ghc-options:         -Wall
-  build-depends:       base >=4.7 && <4.9, text
+  build-depends:       base >=4.7 && <4.9,
+                       text >=1.2.2 && <1.3
   default-language:    Haskell2010
