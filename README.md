@@ -59,7 +59,7 @@ authors
 Produces the following SQLite table declarations:
 
 ~~~.sql
-CREATE TABLE books
+CREATE TABLE IF NOT EXISTS books
   ( id INTEGER PRIMARY KEY ASC
   , title TEXT NOT NULL UNIQUE
   , pages INT NOT NULL DEFAULT 0
@@ -67,7 +67,7 @@ CREATE TABLE books
   , published DATE NOT NULL
   , FOREIGN KEY(author_name) REFERENCES authors(id)
   );
-CREATE TABLE authors
+CREATE TABLE IF NOT EXISTS authors
   ( id INTEGER PRIMARY KEY ASC
   , name TEXT NOT NULL
   , gender BLOB
