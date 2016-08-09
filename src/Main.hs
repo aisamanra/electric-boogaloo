@@ -71,7 +71,7 @@ typeName t
 
 pprint :: Decl -> IO ()
 pprint Decl { dName = n, dFields = fs } = do
-  T.putStr "CREATE TABLE "
+  T.putStr "CREATE TABLE IF NOT EXISTS "
   T.putStrLn n
   T.putStrLn "  ( id INTEGER PRIMARY KEY ASC"
   mapM_ printField fs
