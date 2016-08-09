@@ -1,6 +1,8 @@
 module Main where
 
+import           Control.Monad (when)
 import           Data.Char (isSpace, isAlphaNum)
+import           Data.Monoid ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -11,9 +13,11 @@ data Decl = Decl
   } deriving (Eq, Show)
 
 data Field = Field
-  { fName :: Text
-  , fType :: Text
-  , fNull :: Bool
+  { fName    :: Text
+  , fType    :: Text
+  , fNull    :: Bool
+  , fUniq    :: Bool
+  , fDefault :: Maybe Text
   } deriving (Eq, Show)
 
 uncomment :: Text -> Text
@@ -22,16 +26,30 @@ uncomment = fst . T.breakOn "--"
 isValid :: Text -> Bool
 isValid = T.all (\ x -> isAlphaNum x || x == '_')
 
+isSpecial :: Char -> Bool
+isSpecial c = c == '?' || c == '!'
+
+parseField :: Text -> Field
+parseField ln =
+  let (name, tt) = T.break (== ':') (T.strip ln)
+      (typ, def) = T.break (== '=') (T.strip tt)
+  in Field
+       { fName = T.strip name
+       , fType = T.strip (T.drop 1 (T.filter (not . isSpecial) typ))
+       , fNull = T.any (== '?') typ
+       , fUniq = T.any (== '!') typ
+       , fDefault =
+           case def of
+             "" -> Nothing
+             rs -> Just (T.strip (T.drop 1 rs))
+       }
+
 parse :: Text -> Either String [Decl]
 parse = go [] . map uncomment . T.lines
   where go ds [] = return ds
         go ds (l:ls)
           | T.length (T.takeWhile isSpace l) > 0 =
-            let (n, t) = T.break (== ':') (T.strip l)
-                f = Field { fName = T.strip n
-                          , fType = T.strip (T.drop 1 (T.filter (/= '?') t))
-                          , fNull = T.any (== '?') t
-                          }
+            let f = parseField l
             in case ds of
                  (d:ds') -> go (d { dFields = f : dFields d } : ds') ls
                  []      -> Left "indented line outside of table decl"
@@ -80,14 +98,21 @@ pprint Decl { dName = n, dFields = fs } = do
   where printField Field { fName = f
                          , fType = t
                          , fNull = l
+                         , fUniq = u
+                         , fDefault = d
                          } = do
               T.putStr "  , "
               T.putStr f
               T.putStr " "
               T.putStr (typeName t)
-              if not l
-                then T.putStrLn " NOT NULL"
-                else T.putStrLn ""
+              when (not l) $
+                T.putStr " NOT NULL"
+              when u $
+                T.putStr " UNIQUE"
+              case d of
+                Nothing -> return ()
+                Just dv -> T.putStr (" DEFAULT " <> dv)
+              T.putStrLn ""
         printForeign Field { fName = f, fType = t }
           | t `elem` builtins = return ()
           | otherwise = do
@@ -105,6 +130,7 @@ main = do
   cs <- T.getContents
   case parse cs of
     Left err -> putStrLn err
-    Right ds -> case check ds of
-      Left err -> putStrLn err
-      Right () -> mapM_ pprint (rev ds)
+    Right ds -> do
+      case check ds of
+        Left err -> putStrLn err
+        Right () -> mapM_ pprint (rev ds)

@@ -27,7 +27,10 @@ null  int  integer  real  text  blob  date
 
 or the name of a table declared in the source file. By default
 all values are given the `NOT NULL` qualifier, but this can be
-avoided by ending a type name with a `?` operator.
+avoided by ending a type name with a `?` operator. Additionally,
+rows can be made `UNIQUE` by adding a `!` operator, and a
+default value can be set by adding `= value` to the end of a
+row for whatever value you choose.
 
 All tables get an implicit `id` column of the form
 
@@ -43,7 +46,8 @@ For example, the following `electric-boogaloo` definition:
 
 ~~~
 books
-  title:       text
+  title:       text!
+  pages:       int = 0
   author_name: authors
   published:   date
 
@@ -57,7 +61,8 @@ Produces the following SQLite table declarations:
 ~~~.sql
 CREATE TABLE books
   ( id INTEGER PRIMARY KEY ASC
-  , title TEXT NOT NULL
+  , title TEXT NOT NULL UNIQUE
+  , pages INT NOT NULL DEFAULT 0
   , author_name INTEGER NOT NULL
   , published DATE NOT NULL
   , FOREIGN KEY(author_name) REFERENCES authors(id)
