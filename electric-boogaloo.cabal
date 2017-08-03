@@ -1,5 +1,5 @@
 name:             electric-boogaloo
-version:          0.1.3
+version:          0.2.0
 synopsis:         Simple opinionated sugar for SQLite
 description:      A basic translator for a straightforward, terse sugar
                   designed for making certain SQLite table definitions

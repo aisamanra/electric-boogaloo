@@ -8,6 +8,10 @@ import           Data.Monoid ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import qualified System.Console.GetOpt as Opt
+import qualified System.Environment as Sys
+import qualified System.Exit as Sys
+import qualified System.IO as Sys
 
 data Decl = Decl
   { dName   :: Text
@@ -64,7 +68,15 @@ parse = go [] . map uncomment . T.lines
             in go (d:ds) ls
 
 builtins :: [Text]
-builtins = [ "null", "int", "integer", "real", "text", "blob", "date" ]
+builtins = [ "null"
+           , "int"
+           , "integer"
+           , "real"
+           , "text"
+           , "bool"
+           , "blob"
+           , "date"
+           ]
 
 check :: [Decl] -> Either String ()
 check ds =
@@ -89,50 +101,87 @@ typeName t
   | t `elem` builtins = T.toUpper t
   | otherwise = "INTEGER"
 
-pprint :: Decl -> IO ()
-pprint Decl { dName = n, dFields = fs } = do
-  T.putStr "CREATE TABLE IF NOT EXISTS "
-  T.putStrLn n
-  T.putStrLn "  ( id INTEGER PRIMARY KEY ASC"
+pprint :: Decl -> Sys.Handle -> IO ()
+pprint Decl { dName = n, dFields = fs } h = do
+  T.hPutStr h "CREATE TABLE IF NOT EXISTS "
+  T.hPutStrLn h n
+  T.hPutStrLn h "  ( id INTEGER PRIMARY KEY ASC"
   mapM_ printField fs
   mapM_ printForeign fs
-  T.putStrLn "  );"
+  T.hPutStrLn h "  );"
   where printField Field { fName = f
                          , fType = t
                          , fNull = l
                          , fUniq = u
                          , fDefault = d
                          } = do
-              T.putStr "  , "
-              T.putStr f
-              T.putStr " "
-              T.putStr (typeName t)
+              T.hPutStr h "  , "
+              T.hPutStr h f
+              T.hPutStr h " "
+              T.hPutStr h (typeName t)
               when (not l) $
-                T.putStr " NOT NULL"
+                T.hPutStr h " NOT NULL"
               when u $
-                T.putStr " UNIQUE"
+                T.hPutStr h " UNIQUE"
               case d of
                 Nothing -> return ()
-                Just dv -> T.putStr (" DEFAULT " <> dv)
-              T.putStrLn ""
+                Just dv -> T.hPutStr h (" DEFAULT " <> dv)
+              T.hPutStrLn h ""
         printForeign Field { fName = f, fType = t }
           | t `elem` builtins = return ()
           | otherwise = do
-              T.putStr "  , FOREIGN KEY("
-              T.putStr f
-              T.putStr ") REFERENCES "
-              T.putStr t
-              T.putStrLn "(id)"
+              T.hPutStr h "  , FOREIGN KEY("
+              T.hPutStr h f
+              T.hPutStr h ") REFERENCES "
+              T.hPutStr h t
+              T.hPutStrLn h "(id)"
 
 rev :: [Decl] -> [Decl]
 rev ds = reverse [ d { dFields = reverse (dFields d) } | d <- ds ]
 
+-- *
+
+data Options = Options
+  { inputFile  :: Maybe FilePath
+  , outputFile :: Maybe FilePath
+  }
+
+options :: [Opt.OptDescr (Options -> Options)]
+options =
+  [ let inFile (Just f) o
+          | f /= "-" = o { inputFile = Just f }
+        inFile _ o   = o { inputFile = Nothing }
+    in Opt.Option ['i'] ["input"] (Opt.OptArg inFile "file")
+         "input Electric Boogaloo schema"
+  , let outFile (Just f) o
+          | f /= "-" = o { outputFile = Just f }
+        outFile _ o  = o { outputFile = Nothing }
+    in Opt.Option ['o'] ["output"] (Opt.OptArg outFile "file")
+         "output SQLite schema"
+  ]
+
+guard :: Either String a -> IO a
+guard (Left err) = do
+  Sys.hPutStrLn Sys.stderr err
+  Sys.exitFailure
+guard (Right x) = return x
+
+header :: String
+header = "Electric Boogaloo"
+
 main :: IO ()
 main = do
-  cs <- T.getContents
-  case parse cs of
-    Left err -> putStrLn err
-    Right ds -> do
-      case check ds of
-        Left err -> putStrLn err
-        Right () -> mapM_ pprint (rev ds)
+  args <- Sys.getArgs
+  opts <- guard $ case Opt.getOpt Opt.Permute options args of
+                    (optsApp, [], []) -> return optsApp
+                    _ -> Left (Opt.usageInfo header options)
+  let o = foldl (.) id opts (Options Nothing Nothing)
+  cs <- case inputFile o of
+    Nothing -> T.getContents
+    Just f  -> T.readFile f
+  decls <- guard (parse cs)
+  ()    <- guard (check decls)
+  outH  <- case outputFile o of
+    Nothing -> return Sys.stdout
+    Just f  -> Sys.openFile f Sys.ReadMode
+  mapM_ (flip pprint outH) (rev decls)
